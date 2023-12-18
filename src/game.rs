@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 
-use crate::texture::Texture;
+use crate::{
+    chunk::{Block, Chunk},
+    texture::Texture,
+};
 use anyhow::bail;
-use encase::{ShaderSize, ShaderType, StorageBuffer, UniformBuffer};
+use encase::{DynamicStorageBuffer, ShaderSize, ShaderType, UniformBuffer};
 use wgpu::util::DeviceExt as _;
 use winit::{keyboard::KeyCode, window::Window};
 
@@ -10,25 +13,31 @@ use winit::{keyboard::KeyCode, window::Window};
 struct Camera {
     position: cgmath::Vector3<f32>,
     aspect: f32,
-}
-
-#[derive(ShaderType)]
-struct Vertices {
-    vertices: [cgmath::Vector3<f32>; 6],
+    near_clip: f32,
+    far_clip: f32,
 }
 
 #[derive(ShaderType)]
 struct Face {
     position: cgmath::Vector3<f32>,
+    normal: cgmath::Vector3<f32>,
+    color: cgmath::Vector3<f32>,
 }
 
 #[derive(ShaderType)]
 struct Faces<'a> {
+    vertices: [cgmath::Vector3<f32>; 6],
     #[size(runtime)]
     faces: &'a [Face],
 }
 
+struct FaceInfo {
+    start_offset: u32,
+    count: u32,
+}
+
 pub struct Game {
+    face_infos: Vec<FaceInfo>,
     vertices_faces_bind_group: wgpu::BindGroup,
 
     camera: Camera,
@@ -148,10 +157,60 @@ impl Game {
             }],
         });
 
-        let vertices_uniform_buffer = {
-            let mut buffer = UniformBuffer::new([0; Vertices::SHADER_SIZE.get() as _]);
-            buffer.write(&Vertices {
-                vertices: [
+        let mut chunk = Chunk {
+            blocks: Box::new(std::array::from_fn(|_| {
+                std::array::from_fn(|_| std::array::from_fn(|_| Block::Air))
+            })),
+        };
+        chunk.blocks[0][0][0] = Block::Stone;
+        chunk.blocks[0][0][1] = Block::Stone;
+        chunk.blocks[0][2][0] = Block::Stone;
+        chunk.blocks[1][2][0] = Block::Stone;
+        chunk.blocks[1][2][1] = Block::Stone;
+        chunk.blocks[1][3][1] = Block::Stone;
+
+        let mut face_infos = vec![];
+        let faces_storage_buffer = {
+            let mut buffer = Vec::with_capacity(Faces::min_size().get() as _);
+            let faces = chunk.generate_faces();
+
+            macro_rules! face {
+                ($face:ident, $normal:expr, $vertices:expr $(,)?) => {{
+                    let start_offset = buffer.len().try_into()?;
+
+                    let mut storage_buffer = DynamicStorageBuffer::new(buffer);
+                    storage_buffer.set_offset(start_offset as _);
+                    let faces = faces
+                        .$face
+                        .into_iter()
+                        .map(|(position, block)| Face {
+                            position: position.cast().unwrap(),
+                            normal: $normal,
+                            color: match block {
+                                Block::Air => unreachable!(),
+                                Block::Stone => cgmath::vec3(0.2, 0.2, 0.2),
+                            },
+                        })
+                        .collect::<Vec<_>>();
+                    let face_data = Faces {
+                        vertices: $vertices,
+                        faces: &faces,
+                    };
+                    storage_buffer.write(&face_data)?;
+                    face_infos.push(FaceInfo {
+                        start_offset,
+                        count: face_data.faces.len().try_into()?,
+                    });
+
+                    buffer = storage_buffer.into_inner();
+                    buffer.resize(((buffer.len() + (256 - 1)) & !(256 - 1)), 0);
+                }};
+            }
+
+            face!(
+                back,
+                cgmath::vec3(-1.0, 0.0, 0.0),
+                [
                     cgmath::vec3(-0.5, -0.5, -0.5),
                     cgmath::vec3(-0.5, 0.5, -0.5),
                     cgmath::vec3(-0.5, -0.5, 0.5),
@@ -159,24 +218,69 @@ impl Game {
                     cgmath::vec3(-0.5, 0.5, -0.5),
                     cgmath::vec3(-0.5, 0.5, 0.5),
                 ],
-            })?;
-            let buffer = buffer.into_inner();
+            );
+            face!(
+                front,
+                cgmath::vec3(1.0, 0.0, 0.0),
+                [
+                    cgmath::vec3(0.5, 0.5, -0.5),
+                    cgmath::vec3(0.5, -0.5, -0.5),
+                    cgmath::vec3(0.5, -0.5, 0.5),
+                    cgmath::vec3(0.5, 0.5, -0.5),
+                    cgmath::vec3(0.5, -0.5, 0.5),
+                    cgmath::vec3(0.5, 0.5, 0.5),
+                ],
+            );
 
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Vertices Uniform Buffer"),
-                usage: wgpu::BufferUsages::UNIFORM,
-                contents: &buffer,
-            })
-        };
+            face!(
+                top,
+                cgmath::vec3(0.0, 1.0, 0.0),
+                [
+                    cgmath::vec3(-0.5, 0.5, 0.5),
+                    cgmath::vec3(-0.5, 0.5, -0.5),
+                    cgmath::vec3(0.5, 0.5, -0.5),
+                    cgmath::vec3(-0.5, 0.5, 0.5),
+                    cgmath::vec3(0.5, 0.5, -0.5),
+                    cgmath::vec3(0.5, 0.5, 0.5),
+                ],
+            );
+            face!(
+                bottom,
+                cgmath::vec3(0.0, -1.0, 0.0),
+                [
+                    cgmath::vec3(-0.5, -0.5, -0.5),
+                    cgmath::vec3(-0.5, -0.5, 0.5),
+                    cgmath::vec3(0.5, -0.5, -0.5),
+                    cgmath::vec3(0.5, -0.5, -0.5),
+                    cgmath::vec3(-0.5, -0.5, 0.5),
+                    cgmath::vec3(0.5, -0.5, 0.5),
+                ],
+            );
 
-        let faces_storage_buffer = {
-            let mut buffer = StorageBuffer::new(Vec::with_capacity(Faces::min_size().get() as _));
-            buffer.write(&Faces {
-                faces: &[Face {
-                    position: cgmath::vec3(0.0, 0.0, 0.0),
-                }],
-            })?;
-            let buffer = buffer.into_inner();
+            face!(
+                left,
+                cgmath::vec3(0.0, 0.0, -1.0),
+                [
+                    cgmath::vec3(-0.5, 0.5, -0.5),
+                    cgmath::vec3(-0.5, -0.5, -0.5),
+                    cgmath::vec3(0.5, -0.5, -0.5),
+                    cgmath::vec3(-0.5, 0.5, -0.5),
+                    cgmath::vec3(0.5, -0.5, -0.5),
+                    cgmath::vec3(0.5, 0.5, -0.5),
+                ],
+            );
+            face!(
+                right,
+                cgmath::vec3(0.0, 0.0, 1.0),
+                [
+                    cgmath::vec3(-0.5, -0.5, 0.5),
+                    cgmath::vec3(-0.5, 0.5, 0.5),
+                    cgmath::vec3(0.5, -0.5, 0.5),
+                    cgmath::vec3(0.5, -0.5, 0.5),
+                    cgmath::vec3(-0.5, 0.5, 0.5),
+                    cgmath::vec3(0.5, 0.5, 0.5),
+                ],
+            );
 
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Faces Storage Buffer"),
@@ -188,43 +292,31 @@ impl Game {
         let vertices_faces_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Vertices Faces Bind Group Layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: Some(Vertices::SHADER_SIZE),
-                        },
-                        count: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: true,
+                        min_binding_size: Some(Faces::min_size()),
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: true,
-                            min_binding_size: Some(Faces::min_size()),
-                        },
-                        count: None,
-                    },
-                ],
+                    count: None,
+                }],
             });
 
         let vertices_faces_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Vertices Faces Bind Group"),
             layout: &vertices_faces_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: vertices_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: faces_storage_buffer.as_entire_binding(),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &faces_storage_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(
+                        faces_storage_buffer.size() / face_infos.len() as wgpu::BufferAddress,
+                    ),
+                }),
+            }],
         });
 
         let render_pipeline_layout =
@@ -247,6 +339,7 @@ impl Game {
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Cw,
                 cull_mode: Some(wgpu::Face::Back),
+                // cull_mode: None,
                 unclipped_depth: false,
                 polygon_mode: wgpu::PolygonMode::Fill,
                 conservative: false,
@@ -276,11 +369,14 @@ impl Game {
         });
 
         Ok(Game {
+            face_infos,
             vertices_faces_bind_group,
 
             camera: Camera {
                 position: cgmath::vec3(-2.0, 0.0, 0.0),
                 aspect: size.width as f32 / size.height as f32,
+                near_clip: 0.01,
+                far_clip: 100.0,
             },
             camera_uniform_buffer,
             camera_bind_group,
@@ -302,23 +398,25 @@ impl Game {
     pub fn update(&mut self, dt: std::time::Duration) -> anyhow::Result<()> {
         let ts = dt.as_secs_f32();
 
+        const CAMERA_SPEED: f32 = 3.0;
+
         if self.pressed_keys.contains(&KeyCode::KeyW) {
-            self.camera.position.x += ts;
+            self.camera.position.x += CAMERA_SPEED * ts;
         }
         if self.pressed_keys.contains(&KeyCode::KeyS) {
-            self.camera.position.x -= ts;
+            self.camera.position.x -= CAMERA_SPEED * ts;
         }
         if self.pressed_keys.contains(&KeyCode::KeyA) {
-            self.camera.position.z -= ts;
+            self.camera.position.z -= CAMERA_SPEED * ts;
         }
         if self.pressed_keys.contains(&KeyCode::KeyD) {
-            self.camera.position.z += ts;
+            self.camera.position.z += CAMERA_SPEED * ts;
         }
         if self.pressed_keys.contains(&KeyCode::KeyQ) {
-            self.camera.position.y -= ts;
+            self.camera.position.y -= CAMERA_SPEED * ts;
         }
         if self.pressed_keys.contains(&KeyCode::KeyE) {
-            self.camera.position.y += ts;
+            self.camera.position.y += CAMERA_SPEED * ts;
         }
 
         Ok(())
@@ -431,8 +529,14 @@ impl Game {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.vertices_faces_bind_group, &[0]);
-            render_pass.draw(0..6, 0..1);
+            for face_info in &self.face_infos {
+                render_pass.set_bind_group(
+                    1,
+                    &self.vertices_faces_bind_group,
+                    &[face_info.start_offset],
+                );
+                render_pass.draw(0..6 * face_info.count, 0..1);
+            }
         }
         self.queue.submit([encoder.finish()]);
 

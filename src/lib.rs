@@ -1,5 +1,6 @@
 mod game;
 pub mod texture;
+pub mod chunk;
 
 use game::Game;
 use winit::{
