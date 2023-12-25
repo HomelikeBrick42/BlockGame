@@ -1,6 +1,7 @@
+pub mod chunk;
 mod game;
 pub mod texture;
-pub mod chunk;
+pub mod math;
 
 use game::Game;
 use winit::{
@@ -36,9 +37,19 @@ pub async fn run() -> anyhow::Result<()> {
         Event::WindowEvent {
             event: WindowEvent::KeyboardInput { event, .. },
             window_id,
-        } if window_id == game.window().id() && !elwt.exiting() => {
-            game.key_event(event);
-        }
+        } if window_id == game.window().id() && !elwt.exiting() => match event.state {
+            winit::event::ElementState::Pressed => {
+                if let winit::keyboard::PhysicalKey::Code(code) = event.physical_key {
+                    game.pressed_keys.insert(code);
+                }
+            }
+
+            winit::event::ElementState::Released => {
+                if let winit::keyboard::PhysicalKey::Code(code) = event.physical_key {
+                    game.pressed_keys.remove(&code);
+                }
+            }
+        },
 
         Event::WindowEvent {
             event: WindowEvent::Focused(false),

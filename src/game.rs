@@ -5,6 +5,7 @@ use crate::{
     texture::Texture,
 };
 use anyhow::bail;
+use cgmath::InnerSpace;
 use encase::{DynamicStorageBuffer, ShaderSize, ShaderType, UniformBuffer};
 use wgpu::util::DeviceExt as _;
 use winit::{keyboard::KeyCode, window::Window};
@@ -52,7 +53,7 @@ pub struct Game {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
 
-    pressed_keys: HashSet<winit::keyboard::KeyCode>,
+    pub(crate) pressed_keys: HashSet<winit::keyboard::KeyCode>,
 
     // the window must be dropped last because its referenced by the surface
     window: Window,
@@ -398,44 +399,33 @@ impl Game {
     pub fn update(&mut self, dt: std::time::Duration) -> anyhow::Result<()> {
         let ts = dt.as_secs_f32();
 
-        const CAMERA_SPEED: f32 = 3.0;
+        let mut movement = cgmath::vec3(0.0, 0.0, 0.0);
 
         if self.pressed_keys.contains(&KeyCode::KeyW) {
-            self.camera.position.x += CAMERA_SPEED * ts;
+            movement.x += 1.0;
         }
         if self.pressed_keys.contains(&KeyCode::KeyS) {
-            self.camera.position.x -= CAMERA_SPEED * ts;
+            movement.x -= 1.0;
         }
         if self.pressed_keys.contains(&KeyCode::KeyA) {
-            self.camera.position.z -= CAMERA_SPEED * ts;
+            movement.z -= 1.0;
         }
         if self.pressed_keys.contains(&KeyCode::KeyD) {
-            self.camera.position.z += CAMERA_SPEED * ts;
+            movement.z += 1.0;
         }
         if self.pressed_keys.contains(&KeyCode::KeyQ) {
-            self.camera.position.y -= CAMERA_SPEED * ts;
+            movement.y -= 1.0;
         }
         if self.pressed_keys.contains(&KeyCode::KeyE) {
-            self.camera.position.y += CAMERA_SPEED * ts;
+            movement.y += 1.0;
+        }
+
+        const CAMERA_SPEED: f32 = 3.0;
+        if movement.magnitude2() > 0.001 {
+            self.camera.position += movement.normalize() * CAMERA_SPEED * ts;
         }
 
         Ok(())
-    }
-
-    pub fn key_event(&mut self, event: winit::event::KeyEvent) {
-        match event.state {
-            winit::event::ElementState::Pressed => {
-                if let winit::keyboard::PhysicalKey::Code(code) = event.physical_key {
-                    self.pressed_keys.insert(code);
-                }
-            }
-
-            winit::event::ElementState::Released => {
-                if let winit::keyboard::PhysicalKey::Code(code) = event.physical_key {
-                    self.pressed_keys.remove(&code);
-                }
-            }
-        }
     }
 
     pub fn lost_focus(&mut self) {

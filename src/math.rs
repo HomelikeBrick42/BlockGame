@@ -1,0 +1,152 @@
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
+    pub e012: f32,
+    pub e013: f32,
+    pub e023: f32,
+    pub e123: f32,
+}
+
+impl Point {
+    pub const IDENTITY: Self = Self {
+        e012: 0.0,
+        e013: 0.0,
+        e023: 0.0,
+        e123: 1.0,
+    };
+
+    pub fn translate(self, _motor: Motor) -> Self {
+        /*
+        Apply motor to point
+
+        (a + b*e2*e1 + c*e3*e1 + d*e3*e2 + e*e1*e0 + f*e2*e0 + g*e3*e0 + h*e3*e2*e1*e0)
+        *(i*e0*e1*e2 + j*e0*e1*e3 + k*e0*e2*e3 + l*e1*e2*e3)
+        *(a + b*e1*e2 + c*e1*e3 + d*e2*e3 + e*e0*e1 + f*e0*e2 + g*e0*e3 + h*e0*e1*e2*e3)
+
+        TODO: simplify this by hand because my simplifier program is broken
+        (
+            -2*a*d*j + -2*a*g*l + a*a*i + 2*a*c*k
+            + -1*d*d*i + -2*d*f*l + 2*b*d*k + -2*b*h*l
+            + -2*c*e*l + b*b*i + 2*b*c*j + -1*c*c*i
+        )*e0*e1*e2
+        + (-1*a*b*k + -1*b*b*j + b*c*i + b*e*l)*e0*e1*e3
+        + (-1*a*b*k + a*a*j + a*d*i + a*f*l)*e0*e1*e3
+        + (-1*c*h*l + -1*d*g*l + a*f*l + b*e*l)*e0*e1*e3
+        + (-1*d*d*j + -1*d*g*l + a*d*i + c*d*k)*e0*e1*e3
+        + (-1*c*h*l + b*c*i + c*c*j + c*d*k)*e0*e1*e3
+        + (-1*a*c*i + -1*a*e*l + a*a*k + a*b*j)*e0*e2*e3
+        + (-1*a*c*i + -1*c*c*k + c*d*j + c*g*l)*e0*e2*e3
+        + (-1*a*e*l + -1*d*h*l + b*f*l + c*g*l)*e0*e2*e3
+        + (-1*b*b*k + a*b*j + b*d*i + b*f*l)*e0*e2*e3
+        + (-1*d*h*l + b*d*i + c*d*j + d*d*k)*e0*e2*e3
+        + (a*a*l + b*b*l + c*c*l + d*d*l)*e1*e2*e3
+
+        */
+
+        todo!()
+    }
+}
+
+impl From<cgmath::Vector3<f32>> for Point {
+    fn from(value: cgmath::Vector3<f32>) -> Self {
+        Self {
+            e012: value.z,
+            e013: -value.y,
+            e023: value.x,
+            e123: 1.0,
+        }
+    }
+}
+
+impl From<Point> for cgmath::Vector3<f32> {
+    fn from(value: Point) -> Self {
+        Self {
+            x: value.e023 / value.e123,
+            y: -value.e013 / value.e123,
+            z: value.e012 / value.e123,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Motor {
+    pub s: f32,
+    pub e12: f32,
+    pub e13: f32,
+    pub e23: f32,
+    pub e01: f32,
+    pub e02: f32,
+    pub e03: f32,
+    pub e0123: f32,
+}
+
+impl Motor {
+    pub const IDENTITY: Self = Self {
+        s: 1.0,
+        e12: 0.0,
+        e13: 0.0,
+        e23: 0.0,
+        e01: 0.0,
+        e02: 0.0,
+        e03: 0.0,
+        e0123: 0.0,
+    };
+
+    pub fn apply(self, other: Self) -> Self {
+        let a = self.s;
+        let b = self.e12;
+        let c = self.e13;
+        let d = self.e23;
+        let e = self.e01;
+        let f = self.e02;
+        let g = self.e03;
+        let h = self.e0123;
+        let i = other.s;
+        let j = other.e12;
+        let k = other.e13;
+        let l = other.e23;
+        let m = other.e01;
+        let n = other.e02;
+        let o = other.e03;
+        let p = other.e0123;
+
+        /*
+        Combining Motors
+
+        (a + b*e1*e2 + c*e1*e3 + d*e2*e3 + e*e0*e1 + f*e0*e2 + g*e0*e3 + h*e0*e1*e2*e3)
+        *(i + j*e1*e2 + k*e1*e3 + l*e2*e3 + m*e0*e1 + n*e0*e2 + o*e0*e3 + p*e0*e1*e2*e3)
+
+        -1*b*j + -1*c*k + -1*d*l + a*i
+        + (-1*c*l + a*j + b*i + d*k)*e1*e2
+        + (-1*d*j + a*k + b*l + c*i)*e1*e3
+        + (-1*b*k + a*l + c*j + d*i)*e2*e3
+        + (-1*d*p + -1*f*j + -1*g*k + -1*h*l + a*m + b*n + c*o + e*i)*e0*e1
+        + (-1*b*m + -1*g*l + a*n + c*p + d*o + e*j + f*i + h*k)*e0*e2
+        + (-1*b*p + -1*c*m + -1*d*n + -1*h*j + a*o + e*k + f*l + g*i)*e0*e3
+        + (-1*c*n + -1*f*k + a*p + b*o + d*m + e*l + g*j + h*i)*e0*e1*e2*e3
+        */
+
+        Self {
+            s: -b * j + -c * k + -d * l + a * i,
+            e12: -c * l + a * j + b * i + d * k,
+            e13: -d * j + a * k + b * l + c * i,
+            e23: -b * k + a * l + c * j + d * i,
+            e01: -d * p + -f * j + -g * k + -h * l + a * m + b * n + c * o + e * i,
+            e02: -b * m + -g * l + a * m + c * p + d * o + e * j + f * i + h * k,
+            e03: -b * p + -c * m + -d * n + -h * j + a * o + e * k + f * l + g * i,
+            e0123: -c * n + -f * k + a * p + b * o + d * m + e * l + g * j + h * i,
+        }
+    }
+
+    pub fn inverse(self) -> Self {
+        Self {
+            s: self.s,
+            e12: -self.e12,
+            e13: -self.e13,
+            e23: -self.e23,
+            e01: -self.e01,
+            e02: -self.e02,
+            e03: -self.e03,
+            e0123: self.e0123,
+        }
+    }
+}
