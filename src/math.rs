@@ -64,16 +64,16 @@ impl Point {
                 + -2.0 * a * g * l
                 + a * a * i
                 + 2.0 * a * c * k
-                + -1.0 * d * d * i
+                + -d * d * i
                 + -2.0 * d * f * l
                 + 2.0 * b * d * k
                 + -2.0 * b * h * l
                 + -2.0 * c * e * l
                 + b * b * i
                 + 2.0 * b * c * j
-                + -1.0 * c * c * i,
+                + -c * c * i,
             e013: -2.0 * a * b * k
-                + -1.0 * b * b * j
+                + -b * b * j
                 + 2.0 * b * c * i
                 + 2.0 * b * e * l
                 + a * a * j
@@ -81,19 +81,19 @@ impl Point {
                 + 2.0 * a * f * l
                 + -2.0 * c * h * l
                 + -2.0 * d * g * l
-                + -1.0 * d * d * j
+                + -d * d * j
                 + 2.0 * c * d * k
                 + c * c * j,
             e023: -2.0 * a * c * i
                 + -2.0 * a * e * l
                 + a * a * k
                 + 2.0 * a * b * j
-                + -1.0 * c * c * k
+                + -c * c * k
                 + 2.0 * c * d * j
                 + 2.0 * c * g * l
                 + -2.0 * d * h * l
                 + 2.0 * b * f * l
-                + -1.0 * b * b * k
+                + -b * b * k
                 + 2.0 * b * d * i
                 + d * d * k,
             e123: a * a * l + b * b * l + c * c * l + d * d * l,
