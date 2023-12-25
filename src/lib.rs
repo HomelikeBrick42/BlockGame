@@ -1,7 +1,7 @@
 pub mod chunk;
 mod game;
-pub mod texture;
 pub mod math;
+pub mod texture;
 
 use game::Game;
 use winit::{
