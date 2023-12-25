@@ -428,7 +428,6 @@ impl Game {
                 .transform
                 .apply(Motor::translation(movement.normalize() * CAMERA_SPEED * ts));
         }
-        println!("{:?}", self.camera.transform);
 
         Ok(())
     }
