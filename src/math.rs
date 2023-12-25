@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy)]
+use encase::ShaderType;
+
+#[derive(Debug, Clone, Copy, ShaderType)]
 pub struct Point {
     pub e012: f32,
     pub e013: f32,
@@ -62,40 +64,40 @@ impl Point {
         Self {
             e012: -2.0 * a * d * j
                 + -2.0 * a * g * l
-                + a * a * i
+                + 1.0 * a * a * i
                 + 2.0 * a * c * k
-                + -d * d * i
+                + -1.0 * d * d * i
                 + -2.0 * d * f * l
                 + 2.0 * b * d * k
                 + -2.0 * b * h * l
                 + -2.0 * c * e * l
-                + b * b * i
+                + 1.0 * b * b * i
                 + 2.0 * b * c * j
-                + -c * c * i,
+                + -1.0 * c * c * i,
             e013: -2.0 * a * b * k
-                + -b * b * j
+                + -1.0 * b * b * j
                 + 2.0 * b * c * i
                 + 2.0 * b * e * l
-                + a * a * j
+                + 1.0 * a * a * j
                 + 2.0 * a * d * i
                 + 2.0 * a * f * l
                 + -2.0 * c * h * l
                 + -2.0 * d * g * l
-                + -d * d * j
+                + -1.0 * d * d * j
                 + 2.0 * c * d * k
-                + c * c * j,
+                + 1.0 * c * c * j,
             e023: -2.0 * a * c * i
                 + -2.0 * a * e * l
-                + a * a * k
+                + 1.0 * a * a * k
                 + 2.0 * a * b * j
-                + -c * c * k
+                + -1.0 * c * c * k
                 + 2.0 * c * d * j
                 + 2.0 * c * g * l
                 + -2.0 * d * h * l
                 + 2.0 * b * f * l
-                + -b * b * k
+                + -1.0 * b * b * k
                 + 2.0 * b * d * i
-                + d * d * k,
+                + 1.0 * d * d * k,
             e123: a * a * l + b * b * l + c * c * l + d * d * l,
         }
     }
@@ -122,7 +124,7 @@ impl From<Point> for cgmath::Vector3<f32> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, ShaderType)]
 pub struct Motor {
     pub s: f32,
     pub e12: f32,
@@ -145,6 +147,19 @@ impl Motor {
         e03: 0.0,
         e0123: 0.0,
     };
+
+    pub fn translation(offset: cgmath::Vector3<f32>) -> Self {
+        Self {
+            s: 1.0,
+            e12: 0.0,
+            e13: 0.0,
+            e23: 0.0,
+            e01: offset.x * -0.5,
+            e02: offset.y * -0.5,
+            e03: offset.z * -0.5,
+            e0123: 0.0,
+        }
+    }
 
     pub fn apply(self, other: Self) -> Self {
         let a = self.s;
@@ -186,7 +201,7 @@ impl Motor {
             e13: -d * j + a * k + b * l + c * i,
             e23: -b * k + a * l + c * j + d * i,
             e01: -d * p + -f * j + -g * k + -h * l + a * m + b * n + c * o + e * i,
-            e02: -b * m + -g * l + a * m + c * p + d * o + e * j + f * i + h * k,
+            e02: -b * m + -g * l + a * n + c * p + d * o + e * j + f * i + h * k,
             e03: -b * p + -c * m + -d * n + -h * j + a * o + e * k + f * l + g * i,
             e0123: -c * n + -f * k + a * p + b * o + d * m + e * l + g * j + h * i,
         }

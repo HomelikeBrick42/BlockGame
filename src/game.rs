@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     chunk::{Block, Chunk},
+    math::Motor,
     texture::Texture,
 };
 use anyhow::bail;
@@ -12,7 +13,7 @@ use winit::{keyboard::KeyCode, window::Window};
 
 #[derive(ShaderType)]
 struct Camera {
-    position: cgmath::Vector3<f32>,
+    transform: Motor,
     aspect: f32,
     near_clip: f32,
     far_clip: f32,
@@ -374,7 +375,7 @@ impl Game {
             vertices_faces_bind_group,
 
             camera: Camera {
-                position: cgmath::vec3(-2.0, 0.0, 0.0),
+                transform: Motor::translation(cgmath::vec3(-2.0, 0.0, 0.0)),
                 aspect: size.width as f32 / size.height as f32,
                 near_clip: 0.01,
                 far_clip: 100.0,
@@ -422,8 +423,12 @@ impl Game {
 
         const CAMERA_SPEED: f32 = 3.0;
         if movement.magnitude2() > 0.001 {
-            self.camera.position += movement.normalize() * CAMERA_SPEED * ts;
+            self.camera.transform = self
+                .camera
+                .transform
+                .apply(Motor::translation(movement.normalize() * CAMERA_SPEED * ts));
         }
+        println!("{:?}", self.camera.transform);
 
         Ok(())
     }
