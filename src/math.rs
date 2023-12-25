@@ -14,7 +14,7 @@ impl Point {
         e123: 1.0,
     };
 
-    pub fn translate(self, motor: Motor) -> Self {
+    pub fn transform(self, motor: Motor) -> Self {
         let a = motor.s;
         let b = motor.e12;
         let c = motor.e13;
