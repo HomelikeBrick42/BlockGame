@@ -400,7 +400,7 @@ impl Game {
     pub fn update(&mut self, dt: std::time::Duration) -> anyhow::Result<()> {
         let ts = dt.as_secs_f32();
 
-        const CAMERA_SPEED: f32 = 3.0;
+        const CAMERA_SPEED: f32 = 4.0;
         const CAMERA_ROTATION_SPEED: f32 = std::f32::consts::FRAC_PI_2;
         let mut movement = cgmath::vec3(0.0, 0.0, 0.0);
         let mut pitch = 0.0;
