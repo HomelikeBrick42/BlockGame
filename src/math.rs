@@ -161,6 +161,48 @@ impl Motor {
         }
     }
 
+    pub fn rotation_xy(angle: f32) -> Self {
+        let (sin, cos) = (angle * 0.5).sin_cos();
+        Self {
+            s: cos,
+            e12: sin,
+            e13: 0.0,
+            e23: 0.0,
+            e01: 0.0,
+            e02: 0.0,
+            e03: 0.0,
+            e0123: 0.0,
+        }
+    }
+
+    pub fn rotation_xz(angle: f32) -> Self {
+        let (sin, cos) = (angle * 0.5).sin_cos();
+        Self {
+            s: cos,
+            e12: 0.0,
+            e13: sin,
+            e23: 0.0,
+            e01: 0.0,
+            e02: 0.0,
+            e03: 0.0,
+            e0123: 0.0,
+        }
+    }
+
+    pub fn rotation_yz(angle: f32) -> Self {
+        let (sin, cos) = (angle * 0.5).sin_cos();
+        Self {
+            s: cos,
+            e12: 0.0,
+            e13: 0.0,
+            e23: sin,
+            e01: 0.0,
+            e02: 0.0,
+            e03: 0.0,
+            e0123: 0.0,
+        }
+    }
+
     pub fn apply(self, other: Self) -> Self {
         let a = self.s;
         let b = self.e12;
@@ -205,6 +247,10 @@ impl Motor {
             e03: -b * p + -c * m + -d * n + -h * j + a * o + e * k + f * l + g * i,
             e0123: -c * n + -f * k + a * p + b * o + d * m + e * l + g * j + h * i,
         }
+    }
+
+    pub fn pre_apply(self, other: Self) -> Self {
+        other.apply(self)
     }
 
     pub fn inverse(self) -> Self {

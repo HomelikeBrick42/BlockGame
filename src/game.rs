@@ -400,7 +400,12 @@ impl Game {
     pub fn update(&mut self, dt: std::time::Duration) -> anyhow::Result<()> {
         let ts = dt.as_secs_f32();
 
+        const CAMERA_SPEED: f32 = 3.0;
+        const CAMERA_ROTATION_SPEED: f32 = std::f32::consts::FRAC_PI_2;
         let mut movement = cgmath::vec3(0.0, 0.0, 0.0);
+        let mut pitch = 0.0;
+        let mut yaw = 0.0;
+        let mut roll = 0.0;
 
         if self.pressed_keys.contains(&KeyCode::KeyW) {
             movement.x += 1.0;
@@ -414,20 +419,44 @@ impl Game {
         if self.pressed_keys.contains(&KeyCode::KeyD) {
             movement.z += 1.0;
         }
-        if self.pressed_keys.contains(&KeyCode::KeyQ) {
+        if self.pressed_keys.contains(&KeyCode::ShiftLeft) {
             movement.y -= 1.0;
         }
-        if self.pressed_keys.contains(&KeyCode::KeyE) {
+        if self.pressed_keys.contains(&KeyCode::Space) {
             movement.y += 1.0;
         }
 
-        const CAMERA_SPEED: f32 = 3.0;
+        if self.pressed_keys.contains(&KeyCode::ArrowUp) {
+            pitch += 1.0;
+        }
+        if self.pressed_keys.contains(&KeyCode::ArrowDown) {
+            pitch -= 1.0;
+        }
+        if self.pressed_keys.contains(&KeyCode::ArrowLeft) {
+            yaw -= 1.0;
+        }
+        if self.pressed_keys.contains(&KeyCode::ArrowRight) {
+            yaw += 1.0;
+        }
+        if self.pressed_keys.contains(&KeyCode::KeyQ) {
+            roll -= 1.0;
+        }
+        if self.pressed_keys.contains(&KeyCode::KeyE) {
+            roll += 1.0;
+        }
+
         if movement.magnitude2() > 0.001 {
             self.camera.transform = self
                 .camera
                 .transform
-                .apply(Motor::translation(movement.normalize() * CAMERA_SPEED * ts));
+                .pre_apply(Motor::translation(movement.normalize() * CAMERA_SPEED * ts));
         }
+
+        self.camera.transform = self.camera.transform.pre_apply(
+            Motor::rotation_xy(pitch * CAMERA_ROTATION_SPEED * ts)
+                .apply(Motor::rotation_xz(yaw * CAMERA_ROTATION_SPEED * ts))
+                .apply(Motor::rotation_yz(roll * CAMERA_ROTATION_SPEED * ts)),
+        );
 
         Ok(())
     }
